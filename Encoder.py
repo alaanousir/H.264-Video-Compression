@@ -23,7 +23,27 @@ def motion_estimation_to_all(ref_frame, frame):
         ref_frame: np array of the reference frame image
         frame: current frame image
     returns:
-        residual_frame: the residual frame that will be encoded
+        residual_frame: np array of the residual frame that will be encoded
     """
     #residual_frame = np.array([motion_estimation(search_area, block)
     #                              for ......])
+
+def spatial_model(residual_frame):
+    """
+    Gets the residual frame and applies DCT to it and returns the DCT coefficients.
+    Args:
+        residual_frame: np array of the residual frame that will be encoded
+    returns:
+        coefficients (numpy ndarray): 1d array representing the residual frame
+    """
+    
+def arithmetic_encode(coefficients, vectors):
+    """
+    Applied arithmetic coding to the 1d array representing the bit stream
+    Args:
+        coefficients (numpy ndarray): 1d array representing the residual frame
+        vectors (numpy ndarray): 2d array represnting the motion vector (component in x and y direction) 
+        
+    Returns:
+        acoded  (numpy ndarray): 1d array
+    """
