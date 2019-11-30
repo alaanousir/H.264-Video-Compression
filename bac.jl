@@ -2,6 +2,7 @@
 # I let Julia decide what is the default (32 or 64)
 # NOTE: top of range is exclusive this is why we use -1 
 # NOTE: Vectors are 1-D arrays in Julia
+# NOTE: Code inspired by class lectures and https://web.stanford.edu/class/ee398a/handouts/papers/WittenACM87ArithmCoding.pdf
 """
     bac_config{T<:Integer}
     parametric struct holding the Integer ranges
