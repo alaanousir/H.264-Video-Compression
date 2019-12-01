@@ -1,13 +1,21 @@
 # The ranges were not hard coded to enable 32-bit systems to work well.
 # I let Julia decide what is the default (32 or 64)
 # NOTE: top of range is exclusive this is why we use -1 
-# NOTE: Vectors are 1-D arrays in Julia
+# NOTE: Vectors are 1-D arrays in Julia so Vector{Bool} is the same as
+#       Array{Bool,1}
+# NOTE: In Julia, the last expression is returned and no need for return
+#       keyword
+# NOTE: UInt is an Unsigned Integer, 64 or 32 bits depending onsystem
+# MSB: Most Significant Bit
 """
     bac_config{T<:Integer}
     parametric struct holding the Integer ranges
     Those ranges correspong to 0 , 0.25, 0.75, 1.0 
     Integers are used for more vontrol over percision
 """
+# NOTE: T<:Integer means that T is any integer type
+# This is a parameteric struct like templates in C/C++
+# top::T means that top has type T
 struct bac_config{T<:Integer}
     top::T # p < 1.0
     first_qtr::T # p = 0.25
@@ -19,12 +27,13 @@ struct bac_config{T<:Integer}
     """
     function bac_config{T}(top) where {T<:Integer}
         fq = div(top,4) +1 # first quarter
-        # div is used for iteger division
-        new(top, fq, 2fq, 3fq)
+        # div is used for integer division
+        new(top, fq, 2fq, 3fq) # Return the config struct
     end
 end
 
 """ Returns the Integer type from config """
+# Basically it gets T, T is UInt in our case
 bac_type(_::bac_config{T}) where T = T
 
 """
@@ -41,7 +50,9 @@ mutable struct bac_encode_state{T<:Integer}
 end
 
 
-"""Initializes the encoder state with the same type as theconfig"""
+"""Initializes the encoder state with the same type as the configuration
+   i.e. the bac_config 
+"""
 init_bac_encode(conf) = bac_encode_state{bac_type(conf)}(0, conf.top, 0)
 
 """
@@ -73,10 +84,10 @@ function encode_step(bit::Bool, state::bac_encode_state{T},
     conf::bac_config{T}, LOP::AbstractFloat,
     LOB::Bool, output_bit) where T
 
-    range = T(state.high - state.low + 1) # calculate range and ensure type is T
+    range::T = state.high - state.low + 1 # calculate range and ensure type is T
     # Update low and high 
-    # if LOB [0, po) * range 
-    # if MOB [po, 1) * range 
+    # if LOB [0, LOP) * range 
+    # if MOB [LOP, 1) * range 
     state.high = state.low + (if bit != LOB range else round(range*LOP) end) -1
     state.low = state.low + (if bit != LOB round(range*LOP) else 0 end)
 
@@ -103,7 +114,7 @@ function encode_step(bit::Bool, state::bac_encode_state{T},
         end
 
         # Scale the range up by 2
-        state.low = state.low*2
+        state.low = state.low * 2
         state.high = (state.high + 1)*2 - 1
     end
 end
@@ -124,7 +135,7 @@ end
 
 # Init the condugration with the system's Unsigned Int
 # 2^63 - 1 for 64 bit systems and 2^31 -1 for 32
-conf = bac_config{UInt}((typemax(UInt)>>1) - 1) 
+conf = bac_config{UInt}(typemax(UInt) >> 1)
 
 """
     bitstream_bac_encode(data::Union{Vector{Bool}, BitArray{1}})
@@ -135,8 +146,13 @@ conf = bac_config{UInt}((typemax(UInt)>>1) - 1)
               a bitarray is stored in 1 but while in Vector it is i 8 normally.
               in our case a numpy with dtype Bool will be passed.
 """
+# NOTE: Union{Vector{Bool}, BitArray{1}} means the type is either
+#       Vector{Bool} or BitArray{1}
 function bitstream_bac_encode(data::Union{Vector{Bool}, BitArray{1}})
     # Initialize state using config
+    if typeof(data) != BitArray{1}
+        data = BitArray{1}(data)
+    end
     state = init_bac_encode(conf) 
 
     p1 = sum(data)/length(data) # probability of bit 1 
@@ -146,20 +162,26 @@ function bitstream_bac_encode(data::Union{Vector{Bool}, BitArray{1}})
     LOB =  p1 <= 0.5 #Least Occuring Bit
 
     # Get the Bit Array of the LOP
-    binary_LOP = BitArray(digits(UInt(round(LOP*(conf.top+1))), base=2, pad=64))[end:-1:1]
-
-    # Get the Bit Array of the length of data
+    # Binary of LOP * (2^63 - 1) in a 64 BitArray
+    binary_LOP = BitArray(digits(UInt(round(LOP*((typemax(UInt64)>>1)+1))),
+                                 base=2, pad=64))[end:-1:1]
+    # digits output MSB on the right so we use [end:-1:1] to flip the array
+     
+    # Get the Bit Array of the length of data with 64 bit percision
     bin_len_data = BitArray(digits(UInt(length(data)), base=2, pad=64))[end:-1:1]
 
     # result BitArray starting with the LOB, LOP and length of data
-    res = BitArray([Bool[LOB] ; binary_LOP; bin_len_data])
+    res = BitArray([Bool[LOB]; binary_LOP; bin_len_data])
     
     # define how to output bits; append bits to res
     output_bit(bit::Bool) =  push!(res, bit)
+    # Perform an encoding step for all bits in data 
     for bit::Bool ∈ data
         encode_step(bit, state, conf, LOP, LOB, output_bit)
     end
+    # Output the last bits 
     finalize(state, output_bit)
+    # return the result 
     res
 end
 
