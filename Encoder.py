@@ -60,11 +60,6 @@ def motion_estimation(ref_frame, current_block, coordinates, search_size =64):
     Returns:
         motion_vector: the coordinate distance change (in pixel units) between the current frame and reference frame.
     """
-<<<<<<< HEAD
-    #test
-    # First, find the matching MxN block from the search_area
-    # Then subtract the matched reference block from the current block
-=======
     ###############
     #SPECIAL CASES NOT HANDLED YET
     ############
@@ -83,7 +78,6 @@ def motion_estimation(ref_frame, current_block, coordinates, search_size =64):
                 
     return motion_vectors(coordinates , matching_coordinates , block_size)
    
->>>>>>> 57b2753a4139ee7bed7d44ab6873dfaf7d1c948a
 
 def motion_estimation_to_all(prev_frame, current_frame):
     """
