@@ -12,6 +12,7 @@ def motion_estimation(search_area, block):
     Returns:
         residual: the matched MxN pixels in the previous reference frame
     """
+    #test
     # First, find the matching MxN block from the search_area
     # Then subtract the matched reference block from the current block
 
