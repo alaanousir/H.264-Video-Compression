@@ -10,20 +10,74 @@ import encoder as e
 
 # Second, get sub-images. Now, we have a frame that is divided into 16x16 macroblocks.
 
-def motion_estimation(search_area, block):
+
+def rmse(im, ref_im):
+    """
+    Gets the root mean squared error between 2 images
+    Args:
+         im (numpy array) : The current image
+         ref_im (numpy ndarray): The reference image
+    Returns:
+        rmse: root mean squared error as a metric to compare between the original image and the reconstructed
+    """
+    error = im - reconstructed_image
+    mse = np.sum(np.square(error)) / (im.shape[0] * im.shape[1])
+    rmse = np.sqrt(mse)
+
+    return rmse
+
+def motion_vectors(coordinates, matching_coordinates , block_size):
+    """
+    Gets the coordinates of the current image block, and the coordinates of the matching search area
+    and returns the motion vector
+    Args:
+       coordinates: a tuple containing the x and y coordinates of the image block
+       matching_coordinates: a tuple containing the i and j coordinates of the matching image block
+    Returns:
+        motion_vector: the x and y distances between the x-y coordinates of the image block and the i-j coordinates of the matching block
+    """
+    if x>i:
+        x_dir = x-i+0.5*block_size
+    else:
+        x_dir = i-x+0.5*block_size
+    if y>j:
+        y_dir = y-j+0.5*block_size
+    else:
+        y_dir = j-y+0.5*block_size
+        
+    return (y_dir,x_dir)
+
+def motion_estimation(ref_frame, current_block, coordinates, search_size =64):
     """
     Gets the search area from the reference frame, and the current 16x16 frame block
     and returns the motion vector by subtracting the matched MxN frame block in 
     the search area from the current MxN frame block.
     Args:
-        search_area: a block of pixels from the reference frame
+        ref_frame: the reference frame
         block: a block of 16x16 pixels from the current frame. 
+        coordinates: a tuple containing the x and y coordinates of the image block
+        search_size: is half the size of the search_area as a whole.
     Returns:
         motion_vector: the coordinate distance change (in pixel units) between the current frame and reference frame.
     """
+    ###############
+    #SPECIAL CASES NOT HANDLED YET
+    ############
+               
     # find the matching 16x16 block from the search_area
-    # matching can be obtained by finding the RMSE, or MAP.
-    return motion_vector
+    y, x = coordinates
+    search_area = ref_frame[(y - search_size) : (y + search_size), (x - search_size) : (x + search_size)]
+    block_size = current_block.shape[0]
+    loss_prev = 1000
+    for j in range(search_size - block_size):
+        for i in range(search_size - block_size):
+            loss = rmse(current_block, search_area[i:i+block_size,i:i+block_size])
+            if loss < loss_prev:
+                loss_prev = loss
+                matching_coordinates = (j,i)
+                
+    return motion_vectors(coordinates , matching_coordinates , block_size)
+   
 
 def motion_estimation_to_all(prev_frame, current_frame):
     """
@@ -62,7 +116,7 @@ def residual(prev_frame, predicted_frame):
     Returns:
         residual_frame: np array of the residual frame.
     """
-    return residual_frame
+    return prev_frame-predicted_frame
     
     
 def spatial_model(residual_frame):
