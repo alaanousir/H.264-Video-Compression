@@ -58,6 +58,7 @@ def motion_estimation(ref_frame, current_block, coordinates, search_size =64):
         coordinates: a tuple containing the x and y coordinates of the image block
         search_size: is half the size of the search_area as a whole.
     Returns:
+        residual: np array of the residual macroblock
         motion_vector: the coordinate distance change (in pixel units) between the current frame and reference frame.
     """
     ###############
@@ -75,8 +76,9 @@ def motion_estimation(ref_frame, current_block, coordinates, search_size =64):
             if loss < loss_prev:
                 loss_prev = loss
                 matching_coordinates = (j,i)
-                
-    return motion_vectors(coordinates , matching_coordinates , block_size)
+    motion_vectors = motion_vectors(coordinates , matching_coordinates , block_size)     
+    
+    return residual, vector_vectors
    
 
 def motion_estimation_to_all(prev_frame, current_frame):
@@ -88,11 +90,12 @@ def motion_estimation_to_all(prev_frame, current_frame):
         current_frame: current frame image divided into 16x16 macroblocks.
         - should have a shape of (X, macroblock_size, macroblock_size)
     returns:
+        residuals: np array of the residual macroblocks.
         motion_vectors: np array of size(X, 2) where each macroblock has a motion vector represented in 2 values in the x and y coordinates 
     """
-    #motion_vectors = np.array([motion_estimation(search_area, block)
+    #motion_vectors, residuals = np.array([motion_estimation(search_area, block)
     #                              for ......])
-    return motion_vectors
+    return residuals, motion_vectors
 
 
 def motion_prediction(prev_frame, motion_vectors):
@@ -105,18 +108,6 @@ def motion_prediction(prev_frame, motion_vectors):
         predicted_frame: np array of the predicted frame
     """ 
     return predicted_frame
-
-def residual(prev_frame, predicted_frame):
-    """
-    Gets the previous frame and the predicted frame from the motion prediction block
-    and returns the residual
-    Args:
-        prev_frame: np array of the reference frame image divided into 16x16 macroblocks 
-        predicted_frame: np array of the predicted frame
-    Returns:
-        residual_frame: np array of the residual frame.
-    """
-    return prev_frame-predicted_frame
     
     
 def spatial_model(residual_frame):
