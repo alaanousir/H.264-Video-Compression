@@ -77,8 +77,8 @@ end
         bit::Bool: incoming bit to encode
         state::bac_encode_state{T}: state of the encoder
         conf::bac_config{T}: state of the encoder
-        LOP::AbstractFloat: least occuring bit(LOB) probability
-
+        LOP::AbstractFloat: least occuring bit(LOB) probability 
+        LOB::Bool: Least Occuring Bit(LOB)
 """
 function encode_step(bit::Bool, state::bac_encode_state{T},
     conf::bac_config{T}, LOP::AbstractFloat,
@@ -118,13 +118,20 @@ function encode_step(bit::Bool, state::bac_encode_state{T},
         state.high = (state.high + 1)*2 - 1
     end
 end
+
 """
     finalize(state::bac_encode_state{T}, conf::bac_config{T}) where T
     sends the final bits
 """
 function finalize(state::bac_encode_state{T}, output_bit) where T
-    #NOTE: low is guranteed by scaling to be less than half
+    # NOTE: low is guranteed by scaling to be less than half
+    # and if low is less than quarter Then High is at least bigger than half.
+    # and if low is more than quarter, then high has be over three quarters
+    # so in the first the quarter between first quarter and half is guranteed 
+    # to be inside the range [low, high)
+    # Similarly in the second case we choose the half to third quarter region 
     # So we need to output two bits either 01 or 10 
+    # of course followed by the bits in bits_to_follow
     state.bits_to_follow += 1
     if state.low < conf.first_qtr 
         bits_plus_follow(false, state, output_bit)
@@ -149,10 +156,10 @@ conf = bac_config{UInt}(typemax(UInt) >> 1)
 # NOTE: Union{Vector{Bool}, BitArray{1}} means the type is either
 #       Vector{Bool} or BitArray{1}
 function bitstream_bac_encode(data::Union{Vector{Bool}, BitArray{1}})
+    # Convert to BitArray to save memorty
+    if (typeof(data) != BitArray{1}) data = BitArray{1}(data) end
+
     # Initialize state using config
-    if typeof(data) != BitArray{1}
-        data = BitArray{1}(data)
-    end
     state = init_bac_encode(conf) 
 
     p1 = sum(data)/length(data) # probability of bit 1 
@@ -200,7 +207,7 @@ end
 mutable struct bac_decode_state{T<:Integer}
     low::T
     high::T
-    value::T
+    value::T ## The Arithmetic number read 
 end
 
 """
@@ -218,26 +225,32 @@ Input:
           in our case a numpy with dtype Bool will be passed.
 """
 function bitstream_bac_decode(encoded_data::Union{Vector{Bool}, BitArray{1}})
+    # Convert to BitArray to save memory
+    if (typeof(encoded_data) != BitArray{1}) encoded_data = BitArray{1}(encoded_data) end
 
+    # popfirst! : Removes and returns the first item from collection.
     LOB = popfirst!(encoded_data) # Get the Least Occuring Bit
 
     # Calculate the LOP from the binary stream 
-    binary_LOP = [popfirst!(encoded_data) for _ ∈ 1:64] # Step 1 Pull the bits
-    LOP = sum((UInt64(1) .<< (63:-1:0)).*binary_LOP) / ((typemax(UInt64)>>1))
+    binary_LOP = [popfirst!(encoded_data) for _ ∈ 1:64] # Step 1 Pull(Pop) the bits
+    LOP = sum((UInt64(1) .<< (63:-1:0)) .* binary_LOP) / ((typemax(UInt64)>>1) + 1)
           # sum the the bits converted to Unsigned Int divided by the maximum of our range
-
+          # (UInt64(1) .<< (63:-1:0)) are the powers of 2 from 0 to 63
+          # (typemax(UInt64)>>1) + 1 is 2^63
     # Calculate the Length of signal from bitstream
     bin_len_data = [popfirst!(encoded_data) for _ ∈ 1:64] # Step 1 Pull the bits
     bin_len_data = sum((UInt64(1) .<< (63:-1:0)).*bin_len_data) # Step 2 convert to UInt
                     # sum the the bits converted to Unsigned Int
     # Initialize state using config
+    # low to 0, high to max value (top) and value to 0  
     state = init_bac_decode(conf)
 
-    # Take in as much bits as our percision can handle
+    # Take in as much bits as our percision can handle (63 or 31)
+    # 63 not 64 because that is our top value in config
     # The rest of the bits are read bit by bit using scaling
     bits_to_read = if UInt == UInt64 63 else 31 end
     for _ in 1:bits_to_read
-        state.value = UInt(2)*state.value + popfirst!(encoded_data)
+        state.value = (state.value << 1) + popfirst!(encoded_data)
     end
     # Initialize the result BitArray for
     res = BitArray{1}([])
@@ -247,14 +260,26 @@ function bitstream_bac_decode(encoded_data::Union{Vector{Bool}, BitArray{1}})
     res
 end
 
-
-function decode_step(encoded_data::Union{Vector{Bool}, BitArray{1}},
+"""
+Perform one BAC decoding step in the given bit 
+T is a parametric type inferred from the type of state
+and conf. Enforces state and config to be the same type
+Args:
+    encoded_data::BitArray{1}: incoming bit stream to decode
+    state::bac_decode_state{T}: state of the decoder
+    conf::bac_config{T}: state of the en/decoder
+    LOP::AbstractFloat: least occuring bit(LOB) probability,
+    LOB::Bool: Least Occuring Bit(LOB)
+Returns:
+    bit
+"""
+function decode_step(encoded_data::BitArray{1},
     state::bac_decode_state{T},
     conf::bac_config{T}, LOP::AbstractFloat,
     LOB::Bool) where T
-    range = T(state.high - state.low + 1) # calculate range and ensure type is T
-    cp = T(state.value - state.low + 1)/range
-    bit = cp >= LOP 
+    range = state.high - state.low + 1 # calculate range and ensure type is T
+    cp = (state.value - state.low + 1)/range # Calculate the Cummulative probability
+    bit = cp >= LOP # 1 if cp bigger that LOP NOTE: CP[MOP] = LOP, CP[LOP] = 0
     # if LOB [0, po) * range 
     # if MOB [po, 1) * range 
     state.high = state.low + (if bit != LOB range else round(range*LOP) end) -1
@@ -262,7 +287,7 @@ function decode_step(encoded_data::Union{Vector{Bool}, BitArray{1}},
     while true
         # Apply Scaling if possible, else return
         if state.high < conf.half
-            ;
+            ; # do nothing and wait for scaling
         elseif state.low >= conf.half
             # if in lower half 
             # subtract half
@@ -281,8 +306,11 @@ function decode_step(encoded_data::Union{Vector{Bool}, BitArray{1}},
         # Scale the range up by 2
         state.low = state.low*2
         state.high = (state.high + 1)*2 - 1
-        state.value = 2 * state.value +
+        state.value = (state.value << 1) +
          if isempty(encoded_data) 0 else popfirst!(encoded_data) end
+         # shift by 1 to left ( *2 )
+         # Read next bit if buffer not empty, else read zero
     end
+    # Return LOB if bit is 0/false, else outut !LOB which is MOB
     if bit !LOB else LOB end
 end
