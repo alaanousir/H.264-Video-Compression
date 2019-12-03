@@ -7,6 +7,7 @@
 #       keyword
 # NOTE: UInt is an Unsigned Integer, 64 or 32 bits depending onsystem
 # MSB: Most Significant Bit
+# NOTE: Code inspired by class lectures and https://web.stanford.edu/class/ee398a/handouts/papers/WittenACM87ArithmCoding.pdf
 """
     bac_config{T<:Integer}
     parametric struct holding the Integer ranges
