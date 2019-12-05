@@ -12,7 +12,7 @@ def reshape_image(image, box_size = 16):
     n_rows = np.int(np.floor(image.shape[0]/box_size))
     n_cols = np.int(np.floor(image.shape[1]/box_size))
 
-    image_array = cv2.resize(vid_frame[100], dsize=(n_rows*box_size, n_cols*box_size))
+    image_array = cv2.resize(image, dsize=(n_cols*box_size, n_rows*box_size))
     return image_array
 
 def get_sub_images(image_array, box_size=16):
@@ -74,24 +74,6 @@ def rmse(im, ref_im):
     return rmse
 
 
-
-
-def rmse(im, ref_im):
-    """
-    Gets the root mean squared error between 2 images
-    Args:
-         im (numpy array) : The current image
-         ref_im (numpy ndarray): The reference image
-    Returns:
-        rmse: root mean squared error as a metric to compare between the original image and the reconstructed
-    """
-    error = ref_im - im
-    mse = np.sum(np.square(error)) / (im.shape[0] * im.shape[1])
-    rmse = np.sqrt(mse)
-
-    return rmse
-
-
 def motion_estimation(ref_frame, current_block, block_num, n_rows, n_cols, search_size = 128):
     """
     Gets the search area from the reference frame, and the current 16x16 frame block
@@ -135,12 +117,12 @@ def motion_estimation(ref_frame, current_block, block_num, n_rows, n_cols, searc
                 loss_prev = loss
                 y_moved, x_moved = (j,i)
     
-    motion_vectors = (y_moved-y, x_moved-x)  
+    motion_vectors = (y_moved-border_width, x_moved-border_width)   
     
     return motion_vectors
    
 
-def motion_estimation_to_all(ref_frame, current_frame, n_rows, n_cols, search_size =64):
+def motion_estimation_to_all(ref_frame, current_frame, n_rows, n_cols, search_size =128):
     """
     Gets the reference frame (previous frame) and current frame. The prev_frame could be the k-nth frame where k is the current frame.
     and performs motion estimation on all 16x16 macroblocks in the current frame.
@@ -161,7 +143,7 @@ def motion_estimation_to_all(ref_frame, current_frame, n_rows, n_cols, search_si
     # to get the motion vectors
     for row in range(n_rows):
         for col in range(n_cols):
-            motion_vectors.append(motion_estimation(ref_frame, current_frame[(col + 1)*(row + 1) -1], (row,col), n_rows, n_cols, search_size))
+            motion_vectors.append(motion_estimation(ref_frame, current_frame[row*n_cols + col], (row,col), n_rows, n_cols, search_size))
                                   
     return motion_vectors
 
