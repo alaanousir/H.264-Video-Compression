@@ -74,37 +74,68 @@ def rmse(im, ref_im):
     return rmse
 
 
-def motion_estimation(ref_frame, current_block, coordinates, search_size =64):
+
+
+def rmse(im, ref_im):
+    """
+    Gets the root mean squared error between 2 images
+    Args:
+         im (numpy array) : The current image
+         ref_im (numpy ndarray): The reference image
+    Returns:
+        rmse: root mean squared error as a metric to compare between the original image and the reconstructed
+    """
+    error = ref_im - im
+    mse = np.sum(np.square(error)) / (im.shape[0] * im.shape[1])
+    rmse = np.sqrt(mse)
+
+    return rmse
+
+
+def motion_estimation(ref_frame, current_block, block_num, n_rows, n_cols, search_size = 128):
     """
     Gets the search area from the reference frame, and the current 16x16 frame block
     and returns the motion vector by subtracting the matched MxN frame block in 
     the search area from the current MxN frame block.
     Args:
         ref_frame: the reference frame
-        block: a block of 16x16 pixels from the current frame. 
-        coordinates: a tuple containing the x and y coordinates of the image block
-        search_size: is half the size of the search_area as a whole.
+        current_block: a block of 16x16 pixels from the current frame. 
+        block_num: a tuple containing the i and j values of the image block. Corresponds to the row and column that the block
+        resides in
+        search_size: the size of the search_area as a whole.
     Returns:
         motion_vector: the coordinate distance change (in pixel units) between the current frame and reference frame.
     """
     # Pad the image with the search_size specified at the borders of the image
     # This ensures that the search area will never be outside the boundaries of the image
     h, w = ref_frame.shape
-    padded = np.zeros(( h + search_size*2, w + search_size*2))  # Initialize an array of zeros 
-    padded[search_size : h+search_size, search_size : w+search_size] = ref_frame  # Add the reference frame to this array
-               
+    border_width = int(search_size/2) - 8
+    padded = np.zeros(( h + border_width*2, w + border_width*2))  # Initialize an array of zeros 
+    # Add the reference frame to this array, so that we have a new frame with padded borders of size 64 on each edge
+    padded[border_width : h+border_width, border_width: w+border_width] = ref_frame 
+    
     # find the matching 16x16 block from the search_area
-    y, x = coordinates
-    search_area = padded[(y) : (y + search_size), (x) : (x + search_size)]
+    # Convert this row and column number to x and y coordinates
+    row, col = block_num
     block_size = current_block.shape[0]
+    y, x = (block_size*(row), block_size*(col))
+    
+    # the whole search area is 128*128
+    # The coordinates of the padded np array is different from the coordinates of the current block.
+    # i.e the top left pixel of the current block when mapped to padded np.array, it becomes (x+border_width,y+border_width)
+    search_area = padded[y : (y+ search_size), x : (x + search_size)]
+    
     loss_prev = 1000
-    for j in range(search_size):
-        for i in range(search_size):
-            loss = rmse(current_block, search_area[i:i+block_size,i:i+block_size])
+    c = 0
+    for j in range(search_size -block_size):
+        for i in range(search_size - block_size):
+            c+=1
+            loss = rmse(current_block, search_area[j:j+block_size,i:i+block_size])
             if loss < loss_prev:
                 loss_prev = loss
-                matching_coordinates = (j,i)
-    motion_vectors = (j-y, i-x)   
+                y_moved, x_moved = (j,i)
+    
+    motion_vectors = (y_moved-y, x_moved-x)  
     
     return motion_vectors
    
@@ -126,11 +157,11 @@ def motion_estimation_to_all(ref_frame, current_frame, n_rows, n_cols, search_si
     h, w = ref_frame.shape
     macroblock_size = current_frame.shape[1]
     motion_vectors = []
-    # Tuple containing the coordinates of any given image macroblock.
-    # The coordinates of the centre pixel of the image macroblock
-    for j in range(n_rows):
-        for i in range(n_cols):
-            motion_vectors.append(motion_estimation(ref_frame, current_frame[i],  (j,i), search_size))
+    # Loop over the whole array of macroblocks
+    # to get the motion vectors
+    for row in range(n_rows):
+        for col in range(n_cols):
+            motion_vectors.append(motion_estimation(ref_frame, current_frame[(col + 1)*(row + 1) -1], (row,col), n_rows, n_cols, search_size))
                                   
     return motion_vectors
 
