@@ -2,4 +2,5 @@
 .experiments/*
 .vscode/*
 .ipynb_checkpoints
+Motion_Compensation.ipynb
 __pycache__
