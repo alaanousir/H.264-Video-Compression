@@ -53,7 +53,7 @@ def get_video_frames(path, no_frames = 1000,Resolution=1):
     return vid_frame
 
 def reshape_image(image, box_size = 16):
-     """
+    """
     Gets an image of arbitrary size
     and returns a reshaped array of (box_size, box_size) elements
     Args:
@@ -149,7 +149,7 @@ def residual(current_frame, predicted_frame):
     Returns: 
           residual_frame: np array of the residual macroblock
     """      
-    return abs(current_frame - predicted_frame) 
+    return current_frame.astype(int) - predicted_frame.astype(int)
             
     
     

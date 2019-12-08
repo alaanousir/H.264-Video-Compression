@@ -1,5 +1,5 @@
 .mypy_cache/*
-.experiments/*
+experiments/*
 .vscode/*
 .ipynb_checkpoints
 Motion_Compensation.ipynb
