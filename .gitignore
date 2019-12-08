@@ -2,3 +2,4 @@
 .experiments/*
 .vscode/*
 .ipynb_checkpints
+__pycache__
