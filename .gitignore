@@ -1,5 +1,5 @@
 .mypy_cache/*
 .experiments/*
 .vscode/*
-.ipynb_checkpints
+.ipynb_checkpoints
 __pycache__
