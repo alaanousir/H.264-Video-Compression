@@ -1,7 +1,6 @@
+import Encoder as E
 import numpy as np
 from PIL import Image
-import encoder as e
-import Encoder as E
 import julia 
 jl = julia.Julia()
 jl.include('bac.jl')
@@ -10,13 +9,17 @@ jl.include('motion_estimation.jl')
 
 def encode(path,predictedPerRef, no_frames = 1000,Resolution=1):
     vid_frame=E.get_video_frames(path,no_frames,Resolution)
+    for i in range(len(vid_frame)):
+        vid_frame[i]=E.interlace_comp_frames(vid_frame[i])
     ref_frames=vid_frame[::predictedPerRef]
     vid_mv=[]
     vid_residuals=[]
     for j in range(0,np.int(len(vid_frame)/predictedPerRef)):
 
         #Reshaping the reference frames to use in the coming blocks
-        im_ref,_,_=E.get_sub_images(E.reshape_image(ref_frames[j][0]))
+        im_ref_y,_,_=E.get_sub_images(E.reshape_image(ref_frames[j][0]))
+        im_ref_cb,_,_=E.get_sub_images(E.reshape_image(ref_frames[j][1]))
+        im_ref_cr,_,_=E.get_sub_images(E.reshape_image(ref_frames[j][2]))
 
         for i in range(0,predictedPerRef-1):
             #Reshaping the current frame 
@@ -26,13 +29,16 @@ def encode(path,predictedPerRef, no_frames = 1000,Resolution=1):
             mv = jl.motion_estimation(ref_frames[j][0], current_im_blocks, nrows, ncols)
 
             #Motion Compensation
-            p_image = E.predict(im_ref,mv, ref_frames[0][0].shape[0], ref_frames[0][0].shape[1])
+            p_image_y = E.predict(im_ref_y,mv, ref_frames[0][0].shape[0], ref_frames[0][0].shape[1],16)
+
+            p_image_cb=E.predict(im_ref_cb,mv, ref_frames[0][1].shape[0], ref_frames[0][1].shape[1],8)
+            p_image_cr=E.predict(im_ref_cr,mv, ref_frames[0][1].shape[0], ref_frames[0][1].shape[1],8)
 
             #Calculating the residuals
             residual_frame=E.residual(vid_frame[c][0],p_image)
             
             #Spatial model 
-            residual_frame=E.spatial_model(residual_frame)
+            residual_blocks=E.spatial_model(residual_frame)
 
             
 
@@ -68,7 +74,8 @@ def decoder(Encoded_BitStream,predictedPerRef, no_frames = 1000,Resolution=1):
 
         for i in range(0,predictedPerRef-1):
             #inverse spatial
-            residual_frame=E.spatial_inverse_model(vid_residuals[c])
+            residual_blocks, n_rows, n_cols = E.spatial_inverse_model(vid_residuals[c])
+            residual_frame = E.get_reconstructed_image(residual_blocks, n_rows, n_cols)
 
             #getting the predicted image
             p_image=E.predict(im_ref,vid_mv[c], ref_frames[0][0].shape[0], ref_frames[0][0].shape[1])
