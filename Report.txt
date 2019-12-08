@@ -1,0 +1,10 @@
+JPEG compression is one of the most frequently used form of lossy compression for images. In this paper, we implement JPEG and JPEG_2000 compression and compare different compression types together, computing their compression ratios, root mean square error, and number of FLOP operations for each compression. For JPEG, we use 2 different block sizes for compression. Namely, 8x8 and 16x16. Furthermore, different quantization tables were used. Low quantization table ranges its values from 1-16, and high quantization table ranges its values from 1-256. For JPEG_2000, 2 different quantization arrays are used to quantize the DWT decomposed images. Also, DWT decomposition can be performed at an arbitrary depth of the image.
+
+## Introduction
+
+H.264 is a highly common video compression technique that is widely used with the common and well known format of .mp4. In this project, we implement a fully working encoder and decoder for the H.264 technique. In order to explore our results, we compare different compression rates by choosing how many reference frames to choose which shall give different video qualities that degenerate at high compression rates. Throught the paper, we use a block_size of 16 x 16 for the reference frames to carry out the motion estimation and compensation (predicting frames). Although the code is modular and can work with any given block size, we have chosen 16 x 16 to be our test case. 
+
+
+## H264 technique
+
+This diagram represents the encoding process. There are 2 main models in this scheme, namely, temporal and spatial models. Temporal being the time component which is where we find the highest redundancy and where lies most of the potential for compression. leveraging the redundancy in adjacent frames in a smart and efficient way can provide high compression capabilities with little damage to the data. On the other hand, the spatial model offers yet another 
