@@ -8,7 +8,7 @@ import decoder as d
 
 ## The following functions will be called in the main.py of the video compression
 
-def get_video_frames(path, no_frames = 1000):
+def get_video_frames(path, no_frames = 1000,Resolution=1):
     """
     Gets a path to the video to be read
     Args:
@@ -26,6 +26,8 @@ def get_video_frames(path, no_frames = 1000):
                 print("couldn't open video")
             # Capture frame-by-frame
             ret, frameRGB = vid.read()
+            #Resize in case subpixel estimation is needed
+            frameRGB=cv2.resize(frameRGB,(frameRGB.shape[1]*Resolution,frameRGB.shape[0]*Resolution))
             if ret == True:
                 # Convert frame to YUV with 4:2:0 sampling
                 frameYUV = cv2.cvtColor(frameRGB, cv2.COLOR_RGB2YUV_I420)
@@ -147,7 +149,7 @@ def residual(current_frame, predicted_frame):
     Returns: 
           residual_frame: np array of the residual macroblock
     """      
-    return current_frame - predicted_frame 
+    return abs(current_frame - predicted_frame) 
             
     
     
@@ -161,20 +163,13 @@ def spatial_model(residual_frame):
     """
     
     coeff = e.apply_dct_to_all(residual_frame)
-    quantized_coeff = e.quantize(coeff, m.table_8_high)
-    serialized_coeff=e.serialize(quantized_coeff)
-    return serialized_coeff
+    quantized_coeff = e.quantize(coeff, m.table_16_high)
+    #serialized_coeff=e.serialize(quantized_coeff)
+    return quantized_coeff
 
-def spatial_inverse_model(serialized_coeff):
-    """
-    Gets the serialized coefficients and deserialize it and applies IDCT.
-    Args:
-        serialized_coeff (numpy ndarray): 1d array representing the residual frame
-    Returns:
-        frame blocks (np array)
-    """
-    quantized_coeff=d.deserialize(serialized_coeff)
-    dequantized_coeff=d.dequantize(quantized_coeff)
+def spatial_inverse_model(quantized_coeff):
+    #quantized_coeff=d.deserialize(serialized_coeff,1,nrows,ncols)
+    dequantized_coeff=d.dequantize(quantized_coeff, m.table_16_high)
     return d.apply_idct_to_all(dequantized_coeff)
 
 def get_reconstructed_image(divided_image, n_rows, n_cols, box_size=8):
@@ -206,6 +201,27 @@ def get_reconstructed_image(divided_image, n_rows, n_cols, box_size=8):
     # block_image = Image.fromarray(output[idx])
 
     return image_reconstructed
+
+def conv_decom_YUV2RGB(complete_frame):
+    """
+    Gets a list containing all the components of a YUV in this order [Y, Cb1, Cr1, Cb2, Cr2], then combine them all together
+    and convert them to their RGB equivilant
+    Args:
+        complete_frame: a list of the 5 YUV components
+    Returns:
+        an RGB OpenCV frame (3d numpy array) that is ready to be shown with cv2.imshow()
+    """
+    rows, cols = complete_frame[0].shape[0]+complete_frame[1].shape[0]*2, complete_frame[0].shape[1]
+    Y_row = np.int(rows - rows*1/3)
+    
+    frame1 = np.zeros((rows,cols), dtype= np.uint8)
+    frame1[0:Y_row, : ] = complete_frame[0]
+    frame1[Y_row:np.int(Y_row*1.25),0: np.int(cols/2)] = complete_frame[1]
+    frame1[np.int(Y_row*1.25):np.int(Y_row*1.5), 0: np.int(cols/2)] = complete_frame[2]
+    frame1[Y_row:np.int(Y_row*1.25), np.int(cols/2):]  = complete_frame[3]
+    frame1[np.int(Y_row*1.25):np.int(Y_row*1.5), np.int(cols/2):] = complete_frame[4]
+    
+    return cv2.cvtColor(frame1, cv2.COLOR_YUV2RGB_I420)
 
 def reconstructed(predicted_frame, quantized_coeff):
     """
