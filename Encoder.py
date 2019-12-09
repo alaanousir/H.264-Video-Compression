@@ -57,17 +57,74 @@ def reshape_image(image, box_size = 16):
     Gets an image of arbitrary size
     and returns a reshaped array of (box_size, box_size) elements
     Args:
-        image (np arrat): original image that needs to be reshaped 
-        box_size (int): Size of the box sub images
+    image (np arrat): original image that needs to be reshaped 
+    box_size (int): Size of the box sub images
     Returns:
-        image_array (numpy ndarray, dtype = "uint8"): image reshaped to m x m
-        np array.
+    image_array (numpy ndarray, dtype = "uint8"): image reshaped to m x m
+    np array.
     """
     n_rows = np.int(np.floor(image.shape[0]/box_size))
     n_cols = np.int(np.floor(image.shape[1]/box_size))
 
     image_array = cv2.resize(image, dsize=(n_cols*box_size, n_rows*box_size))
     return image_array
+
+def interlace_comp_frames(complete_frames):
+    """
+    Gets: An array of complete frames and returns an array of interlaced complete frames. It takes the chroma components and 
+        interlaces them together to prepare the frames for motion prediction based on a scaled version of the motion vectors.
+    Args: Complete_frames: a list containing complete frames i.e. each element in a list of 5 image components. 
+    Returns: an array of complete frames but with each containing 3 components, Y Cb (interlaced), Cr (interlaced), respectively.
+    """
+    c_rows, c_cols = complete_frames[0][1].shape * np.array([2,1])
+    chroma_frames = []
+    for frame in complete_frames:
+        c_b = np.zeros((c_rows, c_cols), dtype= np.uint8)
+        c_r = np.zeros((c_rows, c_cols), dtype= np.uint8)
+        Cb1 = frame[1]
+        Cb2 = frame[3]
+
+        Cr1 = frame[2]
+        Cr2 = frame[4]
+
+        for r in range(c_rows):
+            if r%2 == 0:
+                c_b[r] = Cb1[np.int(r/2)]
+                c_r[r] = Cr1[np.int(r/2)]
+            else: 
+                c_b[r] = Cb2[np.int(r/2)]
+                c_r[r] = Cr2[np.int(r/2)]
+
+        chroma_frames.append([frame[0],c_b,c_r])
+        
+    return chroma_frames
+
+def deinterlace_comp_frames(interlaced_frames):
+    
+    c_rows, c_cols = interlaced_frames[0][1].shape * np.array([0.5,1])
+    c_rows, c_cols = np.int(c_rows), np.int(c_cols)
+    complete_frames = []
+    for frame in interlaced_frames:
+        c_b = frame[1]
+        c_r = frame[2]
+        
+        Cb1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+        Cb2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+
+        Cr1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+        Cr2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+
+        for r in range(c_rows*2):
+            if r%2 == 0:
+                Cb1[np.int(r/2)] = c_b[r]
+                Cr1[np.int(r/2)] = c_r[r]
+            else: 
+                Cb2[np.int(r/2)] = c_b[r]
+                Cr2[np.int(r/2)] = c_r[r]
+                
+        complete_frames.append([frame[0],Cb1,Cr1,Cb2,Cr2])
+        
+    return complete_frames
 
 def get_sub_images(image_array, box_size=16):
     """
@@ -112,29 +169,29 @@ def get_sub_images(image_array, box_size=16):
     return image_blocks, n_rows, n_cols
 
 
-def predict(image_blocks, motion_vecs, p_rows, p_cols):
+def predict(image_blocks, motion_vecs, p_rows, p_cols, block_size = 16):
     """
-    Gets: An array of serial image blocks with each block of size 16, 16 and constructs an image of each block moved by
+    Gets: An array of serial image blocks with each block of size block_size, block_size and constructs an image of each block moved by
     a corresponding motion vector.
     Args: 
-        image_blocks: 1D array of image 16x16 blocks 
+        image_blocks: 1D array of image block_size x block_size blocks 
         motion_vecs: motion vectors corresponding to the blocks in image_blocks.
         p_rows: rows of predicted frame (constant for all frames)
         p_cols: columns of predicted frame (constant for all frames)
     Returns: 
         predicted_image: an image where each block has been moved to its predicted place according to its motion vector
     """
-    predicted_image = get_reconstructed_image(image_blocks, np.int(p_rows/16), np.int(p_cols/16), box_size=16)
-    image_blocks = image_blocks.reshape(np.int(p_rows/16),np.int(p_cols/16),16,16)   #contruct the image first with no movements
+    predicted_image = get_reconstructed_image(image_blocks, np.int(p_rows/block_size), np.int(p_cols/block_size), box_size=block_size)
+    image_blocks = image_blocks.reshape(np.int(p_rows/block_size),np.int(p_cols/block_size),block_size,block_size)   #contruct the image first with no movements
     
-    for i in range(np.int(p_rows/16)):
-        for j in range(np.int(p_cols/16)):
+    for i in range(np.int(p_rows/block_size)):
+        for j in range(np.int(p_cols/block_size)):
             vector = motion_vecs[i,j]
             # checking for image boundaries to avoid any out of bound indecies 
-            if i*16 + vector[1] + 16 <= p_rows and i*16 + vector[1] >=0 and j*16 + vector[0] + 16 <= p_cols and j*16 + vector[0] >= 0:
+            if i*block_size + vector[1] + block_size <= p_rows and i*block_size + vector[1] >=0 and j*block_size + vector[0] + block_size <= p_cols and j*block_size + vector[0] >= 0:
                 # move only the blocks where motion vector is not 0 
                 if vector[0] != 0 or vector[1] != 0:
-                    predicted_image[i*16 + vector[1] : i*16 + vector[1] + 16, j*16 + vector[0] : j*16 + vector[0] + 16] = image_blocks[i,j]
+                    predicted_image[i*block_size + vector[1] : i*block_size + vector[1] + block_size, j*block_size + vector[0] : j*block_size + vector[0] + block_size] = image_blocks[i,j]
                     
     return predicted_image
 
@@ -161,16 +218,16 @@ def spatial_model(residual_frame):
     Returns:
         serialized_coeff (numpy ndarray): 1d array representing the residual frame
     """
-    
-    coeff = e.apply_dct_to_all(residual_frame)
-    quantized_coeff = e.quantize(coeff, m.table_16_high)
+    residual_blocks, n_rows, n_cols = e.get_sub_images(residual_frame,16)
+    coeff = e.apply_dct_to_all(residual_blocks)
+    quantized_coeff = e.quantize(coeff, m.table_16_low)
     #serialized_coeff=e.serialize(quantized_coeff)
-    return quantized_coeff
+    return quantized_coeff, n_rows, n_cols
 
-def spatial_inverse_model(quantized_coeff):
+def spatial_inverse_model(quantized_coeff, n_rows, n_cols):
     #quantized_coeff=d.deserialize(serialized_coeff,1,nrows,ncols)
-    dequantized_coeff=d.dequantize(quantized_coeff, m.table_16_high)
-    return d.apply_idct_to_all(dequantized_coeff)
+    dequantized_coeff=d.dequantize(quantized_coeff, m.table_16_low)
+    return d.apply_idct_to_all(dequantized_coeff), n_rows, n_cols
 
 def get_reconstructed_image(divided_image, n_rows, n_cols, box_size=8):
     """
@@ -238,27 +295,27 @@ def reconstructed(predicted_frame, quantized_coeff):
     
 def deinterlace_comp_frames(interlaced_frames):
     
-    c_rows, c_cols = interlaced_frames[0][1].shape * np.array([0.5,1])
+    c_rows, c_cols = interlaced_frames[1].shape * np.array([0.5,1])
     c_rows, c_cols = np.int(c_rows), np.int(c_cols)
-    complete_frames = []
-    for frame in interlaced_frames:
-        c_b = frame[1]
-        c_r = frame[2]
-        
-        Cb1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
-        Cb2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+    #complete_frames = []
+    #for frame in interlaced_frames:
+    c_b = interlaced_frames[1]
+    c_r = interlaced_frames[2]
+    
+    Cb1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+    Cb2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
 
-        Cr1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
-        Cr2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+    Cr1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+    Cr2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
 
-        for r in range(c_rows*2):
-            if r%2 == 0:
-                Cb1[np.int(r/2)] = c_b[r]
-                Cr1[np.int(r/2)] = c_r[r]
-            else: 
-                Cb2[np.int(r/2)] = c_b[r]
-                Cr2[np.int(r/2)] = c_r[r]
+    for r in range(c_rows*2):
+        if r%2 == 0:
+            Cb1[np.int(r/2)] = c_b[r]
+            Cr1[np.int(r/2)] = c_r[r]
+        else: 
+            Cb2[np.int(r/2)] = c_b[r]
+            Cr2[np.int(r/2)] = c_r[r]
                 
-        complete_frames.append([frame[0],Cb1,Cr1,Cb2,Cr2])
+        #complete_frames.append([frame[0],Cb1,Cr1,Cb2,Cr2])
         
-    return complete_frames
+    return [interlaced_frames[0],Cb1,Cr1,Cb2,Cr2]
