@@ -181,7 +181,7 @@ def predict(image_blocks, motion_vecs, p_rows, p_cols, block_size = 16):
     Returns: 
         predicted_image: an image where each block has been moved to its predicted place according to its motion vector
     """
-    predicted_image = get_reconstructed_image(image_blocks, np.int(p_rows/block_size), np.int(p_cols/block_size), box_size=block_size)
+    predicted_image = d.get_reconstructed_image(image_blocks, np.int(p_rows/block_size), np.int(p_cols/block_size), box_size=block_size)
     image_blocks = image_blocks.reshape(np.int(p_rows/block_size),np.int(p_cols/block_size),block_size,block_size)   #contruct the image first with no movements
     
     for i in range(np.int(p_rows/block_size)):
@@ -210,54 +210,44 @@ def residual(current_frame, predicted_frame):
             
     
     
-def spatial_model(residual_frame):
+def spatial_model(residual_frame, box_size):
     """
-    Gets the residual frame and applies DCT to it and returns the DCT coefficients.
+    Gets the residual frame, converts it into 8x8 or 16x16 blocks and applies DCT to it and returns the DCT coefficients.
     Args:
         residual_frame: np array of the residual frame of shape (X, macroblock_size, macroblock_size) that will be encoded
+        box_size: size of blocks.
     Returns:
-        serialized_coeff (numpy ndarray): 1d array representing the residual frame
+        quantized_coeff (numpy ndarray): 1d array representing the residual frame
     """
-    residual_blocks, n_rows, n_cols = e.get_sub_images(residual_frame,16)
+    residual_blocks, n_rows, n_cols = e.get_sub_images(residual_frame,box_size)
     coeff = e.apply_dct_to_all(residual_blocks)
-    quantized_coeff = e.quantize(coeff, m.table_16_low)
-    #serialized_coeff=e.serialize(quantized_coeff)
-    return quantized_coeff, n_rows, n_cols
+    if box_size == 16:
+        table =  m.table_16_low
+    else:
+        table = m.table_8_low        
+    quantized_coeff = e.quantize(coeff, table)
+    return quantized_coeff
 
-def spatial_inverse_model(quantized_coeff, n_rows, n_cols):
-    #quantized_coeff=d.deserialize(serialized_coeff,1,nrows,ncols)
-    dequantized_coeff=d.dequantize(quantized_coeff, m.table_16_low)
-    return d.apply_idct_to_all(dequantized_coeff), n_rows, n_cols
-
-def get_reconstructed_image(divided_image, n_rows, n_cols, box_size=8):
+def spatial_inverse_model(quantized_coeff, n_rows, n_cols, box_size):
     """
-    Gets an array of (box_size,box_size) pixels
-    and returns the reconstructed image
+    Gets the quantized coefficients and returns the reconstructed residual frame
     Args:
-        divided_image (numpy ndarray, dtype = "uint8"): array of divided images
-        n_rows: number of rows or blocks
-        n_cols: number of columns in image
-            the number of blocks is n_rows*n_cols
-        box_size (int): Size of the box sub images
+        quantized_coeff: np array of the quantized coefficients of shape (X, block_size, block_size) that will be encoded
+        n_rows: number of rows
+        n_cols: number of columns
     Returns:
-        reconstructed_image (numpy ndarray): Image reconstructed from the array
-        of divided images.
-
+        reconstructed_residual (numpy ndarray): 1d array representing the residual frame
     """
-    image_reconstructed = np.zeros((n_rows*box_size, n_cols*box_size), dtype=np.uint8)
-    c = 0
-    # break down the image into blocks
-    for i in range(n_rows):
-        for j in range(n_cols):
-            image_reconstructed[i*box_size: i*box_size+box_size,
-                                j*box_size: j*box_size+box_size] = divided_image[c]
-            c += 1
-            
-    # If you want to reconvert the output of this function into images,
-    #  use the following line:
-    # block_image = Image.fromarray(output[idx])
+    if box_size == 16:
+        table =  m.table_16_low
+    else:
+        table = m.table_8_low 
+        
+    dequantized_coeff=d.dequantize(quantized_coeff, table)
+    divided_image = d.apply_idct_to_all(dequantized_coeff)
+    return d.get_reconstructed_image(divided_image, n_rows, n_cols, box_size)
 
-    return image_reconstructed
+
 
 def conv_decom_YUV2RGB(complete_frame):
     """
