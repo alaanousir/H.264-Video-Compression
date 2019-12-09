@@ -58,6 +58,22 @@ def encode(path,predictedPerRef, no_frames = 1000,Resolution=1):
 
             c+=1
         c+=1
+    # Delete unwanted variables 
+    #del ref_frames
+    del residual_frame_y, residual_frame_cb, residual_frame_cr
+    del p_image_cb, p_image_cr
+    
+    # Perform the spatial model
+    quantized_coeff = []
+    for j in range(0,predictedPerRef-1):
+        quantized_coeff_y = E.spatial_model(vid_residuals[j][0], 16)
+    
+        quantized_coeff_cb = E.spatial_model(vid_residuals[j][1], 8)
+    
+        quantized_coeff_cr = E.spatial_model(vid_residuals[j][2], 8)
+    
+        quantized_coeff.append([quantized_coeff_y,quantized_coeff_cb,quantized_coeff_cr])
+        del quantized_coeff_y, quantized_coeff_cb, quantized_coeff_cr
     #change into bitStream
 
     #encode using BAC
@@ -66,7 +82,21 @@ def encode(path,predictedPerRef, no_frames = 1000,Resolution=1):
     return Encoded_BitStream  
 
 def decoder(Encoded_BitStream,predictedPerRef, no_frames = 1000,Resolution=1):
+    
     Bitstream=jl.bitstream_bac_decode(Encoded_BitStream)
+    
+    # Inverse the spatial model
+    
+    quantized_residual = []
+    for j in range(0,predictedPerRef-1):
+        quantized_residual_y =  E.spatial_inverse_model(quantized_coeff[j][0], nrows, ncols, 16)
+
+        quantized_residual_cb  = E.spatial_inverse_model(quantized_coeff[j][1], nrows, ncols, 8)
+
+        quantized_residual_cr = E.spatial_inverse_model(quantized_coeff[j][2], nrows, ncols, 8) 
+    
+        quantized_residual.append([quantized_residual_y, quantized_residual_cb, quantized_residual_cr])
+        del quantized_residual_y, quantized_residual_cb, quantized_residual_cr
     
     #return residual, motion vectors, reference frame from bitstream
 
