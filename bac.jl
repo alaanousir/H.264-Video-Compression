@@ -292,8 +292,8 @@ function decode_step(current_index::Int, encoded_data::BitArray{1},
     bit = cp >= LOP # 1 if cp bigger that LOP NOTE: CP[MOP] = LOP, CP[LOP] = 0
     # if LOB [0, po) * range 
     # if MOB [po, 1) * range 
-    state.high = state.low + (if bit != LOB range else round(range*LOP) end) -1
-    state.low = state.low + (if bit != LOB round(range*LOP) else 0 end)
+    state.high = state.low + (if bit != 0 range else round(range*LOP) end) -1
+    state.low = state.low + (if bit != 0 round(range*LOP) else 0 end)
     while true
         # Apply Scaling if possible, else return
         if state.high < conf.half
