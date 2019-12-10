@@ -57,7 +57,7 @@ def reshape_image(image, box_size = 16):
     Gets an image of arbitrary size
     and returns a reshaped array of (box_size, box_size) elements
     Args:
-    image (np arrat): original image that needs to be reshaped 
+    image (np array): original image that needs to be reshaped 
     box_size (int): Size of the box sub images
     Returns:
     image_array (numpy ndarray, dtype = "uint8"): image reshaped to m x m

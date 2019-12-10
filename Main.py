@@ -8,12 +8,25 @@ jl.include('bac.jl')
 jl.include('motion_estimation.jl')
 
 
-def encode(path,predictedPerRef, no_frames = 1000,Resolution=1):
+def encode(path, predictedPerRef, no_frames = 1000,Resolution=1):
     vid_frame=E.get_video_frames(path,no_frames,Resolution)
     vid_frame=E.interlace_comp_frames(vid_frame)
     ref_frames=vid_frame[::predictedPerRef]
-    vid_mv=[]
-    vid_residuals=[]
+    n_predicted_frames = no_frames - int(np.ceil(len(vid_frame)/predictedPerRef))
+    
+    #pre-allocate residuals and motion vectors
+    residual_frames_y = np.zeros((n_predicted_frames,
+    vid_frame[0][0].shape[0], vid_frame[0][0].shape[1]), dtype = int)
+
+    residual_frames_cb = np.zeros((n_predicted_frames,
+    vid_frame[0][1].shape[0], vid_frame[0][1].shape[1]), dtype = int)
+
+    residual_frames_cr= np.zeros((n_predicted_frames,
+    vid_frame[0][2].shape[0], vid_frame[0][2].shape[1]), dtype = int)
+
+    vid_mv = np.zeros((n_predicted_frames, int(vid_frame[0][0].shape[0]/16),
+     int(vid_frame[0][0].shape[1]/16), 2), dtype = int)
+
     c=1
     for j in range(0,math.ceil(len(vid_frame)/predictedPerRef)):
 
@@ -42,41 +55,29 @@ def encode(path,predictedPerRef, no_frames = 1000,Resolution=1):
             p_image_cr=E.predict(im_ref_cr,mv_cb, ref_frames[0][2].shape[0], ref_frames[0][2].shape[1],8)
 
             #Calculating the residuals
-            residual_frame_y=E.residual(vid_frame[c][0],p_image_y)
-            residual_frame_cb=E.residual(vid_frame[c][1],p_image_cb)
-            residual_frame_cr=E.residual(vid_frame[c][2],p_image_cr)
-
-            #Spatial model 
-            #residual_blocks=E.spatial_model(residual_frame)
-
+            res_index = int(c - np.ceil(j/predictedPerRef) - 1)
+            residual_frames_y[res_index] = E.residual(vid_frame[c][0],p_image_y)
+            residual_frames_cb[res_index] = E.residual(vid_frame[c][1],p_image_cb)
+            residual_frames_cr[res_index] = E.residual(vid_frame[c][2],p_image_cr)
             
-
-            # appending motion vectors and residual frames to change into bits
-            vid_mv.append(mv)
-            vid_residuals.append([residual_frame_y,residual_frame_cb,residual_frame_cr])
-
-            
-
+            vid_mv[res_index] = mv
             c+=1
             if(c>len(vid_frame)-1):
                 break
         c+=1
     # Delete unwanted variables 
-    #del ref_frames
-    del residual_frame_y, residual_frame_cb, residual_frame_cr
     del p_image_cb, p_image_cr
     
     # Perform the spatial model
-    quantized_coeff = []
-    for j in range(0,predictedPerRef-1):
-        quantized_coeff_y = E.spatial_model(vid_residuals[j][0], 16)
-    
-        quantized_coeff_cb = E.spatial_model(vid_residuals[j][1], 8)
-    
-        quantized_coeff_cr = E.spatial_model(vid_residuals[j][2], 8)
-    
-        quantized_coeff.append([quantized_coeff_y,quantized_coeff_cb,quantized_coeff_cr])
-        del quantized_coeff_y, quantized_coeff_cb, quantized_coeff_cr
+    quantized_coeff_y = []
+    quantized_coeff_cb = []
+    quantized_coeff_cr = []
+    for j in range(0, n_predicted_frames):
+        quantized_coeff_y.append(E.spatial_model(residual_frames_y[j], 16))
+        
+        quantized_coeff_cb.append(E.spatial_model(residual_frames_cb[j], 8))
+        
+        quantized_coeff_cr.append(E.spatial_model(residual_frames_cr[j], 8))
     #change into bitStream
 
     #encode using BAC
@@ -89,18 +90,17 @@ def decode(Encoded_BitStream,predictedPerRef, no_frames = 1000,Resolution=1):
     Bitstream=jl.bitstream_bac_decode(Encoded_BitStream)
     
     # Inverse the spatial model
+    quantized_residual_y = np.zeros((n_predicted_frames, vid_frame[0][0].shape[0], vid_frame[0][0].shape[1]), dtype = int)
+    quantized_residual_cb = np.zeros((n_predicted_frames, vid_frame[0][1].shape[0], vid_frame[0][1].shape[1]), dtype = int)
+    quantized_residual_cr = np.zeros((n_predicted_frames, vid_frame[0][2].shape[0], vid_frame[0][2].shape[1]), dtype = int)
     
-    quantized_residual = []
     for j in range(0,predictedPerRef-1):
-        quantized_residual_y =  E.spatial_inverse_model(quantized_coeff[j][0], nrows, ncols, 16)
+        quantized_residual_y[j] = E.spatial_inverse_model(quantized_coeff_y[j], nrows, ncols, 16)
 
-        quantized_residual_cb  = E.spatial_inverse_model(quantized_coeff[j][1], nrows, ncols, 8)
+        quantized_residual_cb[j] =  E.spatial_inverse_model(quantized_coeff_cb[j], nrows, ncols, 8)
 
-        quantized_residual_cr = E.spatial_inverse_model(quantized_coeff[j][2], nrows, ncols, 8) 
-    
-        quantized_residual.append([quantized_residual_y, quantized_residual_cb, quantized_residual_cr])
-        del quantized_residual_y, quantized_residual_cb, quantized_residual_cr
-    
+        quantized_residual_cr[j] = E.spatial_inverse_model(quantized_coeff_cr[j], nrows, ncols, 8) 
+
     #return residual, motion vectors, reference frame from bitstream
 
     #ref_frames has the same shape as the ref_frames variable in the encoder
