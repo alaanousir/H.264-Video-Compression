@@ -21,7 +21,7 @@ def encode(path, predictedPerRef, no_frames = 5,Resolution=1):
     vid_frame=E.get_video_frames(path,no_frames,Resolution)
     vid_frame=E.interlace_comp_frames(vid_frame)
     ref_frames=vid_frame[::predictedPerRef]
-    n_predicted_frames = no_frames - int(np.ceil(len(vid_frame)/predictedPerRef))
+    n_predicted_frames = no_frames - int(np.ceil(len(vid_frame)/(predictedPerRef+1)))
     
     #pre-allocate residuals and motion vectors
     residual_frames_y = np.zeros((n_predicted_frames,
