@@ -11,10 +11,9 @@ function binarize_mv(vid_mv)
     # upper limit of 255
     res = get_bits(mv_size, 8)
     offset_bin = get_bits(abs(offset), mv_size)
-    n_frames_bin = get_bits(n_frames, 64)
     n_row_bin = get_bits(n_row, 16)
     n_col_bin = get_bits(n_col, 16)
-    res = [res ; offset >= 0; offset_bin; n_frames_bin; n_row_bin; n_col_bin]
+    res = [res ; offset >= 0; offset_bin; n_row_bin; n_col_bin]
     for f in 1:n_frames for c in 1:n_row for r in 1:n_col
         mv1 = get_bits(vid_mv[f,c,r,1], mv_size)
         mv2 = get_bits(vid_mv[f,c,r,2], mv_size)
@@ -24,11 +23,10 @@ function binarize_mv(vid_mv)
 end
 read_bits_to_decimal(bitstream, nbits) = sum((1 .<< ((nbits-1):-1:0)).* 
                                        [popfirst!(bitstream) for _ ∈ 1:nbits])
-function debinarize_mv(bitstream)
+function debinarize_mv(bitstream, n_frames)
     mv_size = read_bits_to_decimal(bitstream, 8)
     offset_sign = if popfirst!(bitstream) 1 else -1 end
     offset = read_bits_to_decimal(bitstream, mv_size)
-    n_frames = read_bits_to_decimal(bitstream,64)
     n_row = read_bits_to_decimal(bitstream,16)
     n_col = read_bits_to_decimal(bitstream,16)
     vid_mv = zeros(Int, n_frames, n_row, n_col, 2) 
@@ -36,10 +34,11 @@ function debinarize_mv(bitstream)
         vid_mv[f,c,r,1] = read_bits_to_decimal(bitstream, mv_size)
         vid_mv[f,c,r,2] = read_bits_to_decimal(bitstream, mv_size)
     end    end    end
-    vid_mv .+ offset_sign*offset , n_frames, n_row, n_col
+    vid_mv .+ offset_sign*offset , n_row, n_col
 end
 
-function binarize_res(quantized_coeff_y, quantized_coeff_cb, quantized_coeff_cr)    
+function binarize_res(quantized_coeffs)
+    quantized_coeff_y, quantized_coeff_cb, quantized_coeff_cr = quantized_coeffs
     offset = min((quantized_coeff_y...)...
                 ,(quantized_coeff_cb...)... 
                 ,(quantized_coeff_cr...)...)
