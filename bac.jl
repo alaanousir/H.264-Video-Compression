@@ -184,6 +184,8 @@ function bitstream_bac_encode(data::Union{Vector{Bool}, BitArray{1}})
     # define how to output bits; append bits to res
     output_bit(bit::Bool) =  push!(res, bit)
     # Perform an encoding step for all bits in data 
+    println(LOP)
+    println(LOB)
     for bit::Bool ∈ data
         encode_step(bit, state, conf, LOP, LOB, output_bit)
     end
@@ -231,7 +233,7 @@ function bitstream_bac_decode(encoded_data::Union{Vector{Bool}, BitArray{1}})
 
     # popfirst! : Removes and returns the first item from collection.
     LOB = popfirst!(encoded_data) # Get the Least Occuring Bit
-
+    println(LOB)
     # Calculate the LOP from the binary stream 
     binary_LOP = [popfirst!(encoded_data) for _ ∈ 1:64] # Step 1 Pull(Pop) the bits
     LOP = sum((UInt64(1) .<< (63:-1:0)) .* binary_LOP) / ((typemax(UInt64)>>1) + 1)
@@ -242,6 +244,7 @@ function bitstream_bac_decode(encoded_data::Union{Vector{Bool}, BitArray{1}})
     bin_len_data = [popfirst!(encoded_data) for _ ∈ 1:64] # Step 1 Pull the bits
     bin_len_data = sum((UInt64(1) .<< (63:-1:0)).*bin_len_data) # Step 2 convert to UInt
                     # sum the the bits converted to Unsigned Int
+    println(LOP)
     # Initialize state using config
     # low to 0, high to max value (top) and value to 0  
     state = init_bac_decode(conf)
@@ -255,8 +258,14 @@ function bitstream_bac_decode(encoded_data::Union{Vector{Bool}, BitArray{1}})
     end
     # Initialize the result BitArray for
     res = BitArray{1}([])
+    current_index = 1
+    len = length(encoded_data)
     while length(res) < bin_len_data
-        push!(res, decode_step(encoded_data, state, conf, LOP, LOB))
+        # if current_index%10000 == 0
+        #     print("\r $(current_index/len*100)%")
+        # end
+        bit, current_index = decode_step(current_index, encoded_data, state, conf, LOP, LOB)
+        push!(res, bit)
     end
     res
 end
@@ -274,7 +283,7 @@ Args:
 Returns:
     bit
 """
-function decode_step(encoded_data::BitArray{1},
+function decode_step(current_index::Int, encoded_data::BitArray{1},
     state::bac_decode_state{T},
     conf::bac_config{T}, LOP::AbstractFloat,
     LOB::Bool) where T
@@ -304,14 +313,20 @@ function decode_step(encoded_data::BitArray{1},
         else
             break
         end
-        # Scale the range up by 2
+        #read next bit 
+        if current_index <= length(encoded_data)
+            next_bit = encoded_data[current_index] 
+            current_index+=1
+        else
+            next_bit = 0
+        end 
+        # Scale the range up by 2                
         state.low = state.low*2
         state.high = (state.high + 1)*2 - 1
-        state.value = (state.value << 1) +
-         if isempty(encoded_data) 0 else popfirst!(encoded_data) end
+        state.value = (state.value << 1) + next_bit
          # shift by 1 to left ( *2 )
          # Read next bit if buffer not empty, else read zero
     end
     # Return LOB if bit is 0/false, else outut !LOB which is MOB
-    if bit !LOB else LOB end
+    if bit !LOB else LOB end, current_index
 end
