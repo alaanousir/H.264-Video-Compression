@@ -54,7 +54,6 @@ function binarize_res(quantized_coeffs)
                 ,(quantized_coeff_cr...)...)
     res_size = Int(ceil(log2(max_res)))
     @assert res_size==9 "each should occupy 9 bits"
-    println(offset, '\t', n_frames, '\t', max_res, '\t',res_size)
     res = BitArray([offset >= 0; get_bits(abs(offset), res_size)])
 
     function _write_color_helper(arr)
@@ -95,7 +94,6 @@ function binarize_ref_frames(ref_frames::Array{Array{UInt8,2},2})
     ref_frames_y = cat(ref_frames[:,1]...,dims=3)
     ref_frames_cb = cat(ref_frames[:,2]...,dims=3)
     ref_frames_cr = cat(ref_frames[:,3]...,dims=3)
-    println(size(ref_frames_y), '\t', size(ref_frames_cb), '\t', size(ref_frames_cr), '\t')
     res = BitArray(Bool[])
     function _binarize_ref_helper(arr)
         for i in 1:size(arr)[3] for j in 1:size(arr)[1] for k in 1:size(arr)[2]

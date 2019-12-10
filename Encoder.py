@@ -30,7 +30,7 @@ def get_video_frames(path, no_frames = 1000,Resolution=1):
             frameRGB=cv2.resize(frameRGB,(frameRGB.shape[1]*Resolution,frameRGB.shape[0]*Resolution))
             if ret == True:
                 # Convert frame to YUV with 4:2:0 sampling
-                frameYUV = cv2.cvtColor(frameRGB, cv2.COLOR_RGB2YUV_I420)
+                frameYUV = cv2.cvtColor(frameRGB, cv2.COLOR_BGR2YUV_I420)
 
                 # Get frame components
                 rows, cols = frameYUV.shape 
@@ -268,7 +268,7 @@ def conv_decom_YUV2RGB(complete_frame):
     frame1[Y_row:np.int(Y_row*1.25), np.int(cols/2):]  = complete_frame[3]
     frame1[np.int(Y_row*1.25):np.int(Y_row*1.5), np.int(cols/2):] = complete_frame[4]
     
-    return cv2.cvtColor(frame1, cv2.COLOR_YUV2RGB_I420)
+    return cv2.cvtColor(frame1, cv2.COLOR_YUV2BGR_I420)
 
 def reconstructed(predicted_frame, quantized_coeff):
     """
