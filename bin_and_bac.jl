@@ -4,8 +4,8 @@ function encode_bin_bac(vid_mv,predictedPerRef, no_frames,
                         quantized_coeffs, ref_frames)
     res = [get_bits(no_frames, 64); get_bits(predictedPerRef, 16)]
     push!(res, binarize_mv(vid_mv)...)
-    push!(res, binarize_mv(quantized_coeffs)...)
-    push!(res, binarize_mv(ref_frames)...)
+    push!(res, binarize_res(quantized_coeffs)...)
+    push!(res, binarize_ref_frames(ref_frames)...)
     bitstream_bac_encode(res)
 end
 
