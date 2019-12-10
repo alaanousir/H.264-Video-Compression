@@ -2,7 +2,8 @@
 
 ## To view and test the code
 
-Open Report.ipynb and run the cells in it.
+Open Report.ipynb and run the cells in it to view the report and part of the demo.
+Open Demo.ipynb to view the whole pipeline executed.
 
 ## File description
 
