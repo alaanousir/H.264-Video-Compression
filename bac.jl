@@ -184,11 +184,8 @@ function bitstream_bac_encode(data::Union{Vector{Bool}, BitArray{1}})
     # define how to output bits; append bits to res
     output_bit(bit::Bool) =  push!(res, bit)
     # Perform an encoding step for all bits in data 
-    # for bit::Bool ∈ data
-    while true
-        bit = popfirst!(data)
+    for bit::Bool ∈ data
         encode_step(bit, state, conf, LOP, LOB, output_bit)
-        if !isempty(data) break end
     end
     # Output the last bits 
     finalize(state, output_bit)

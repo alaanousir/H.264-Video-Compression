@@ -3,10 +3,10 @@ include("bac.jl")
 function encode_bin_bac(vid_mv,predictedPerRef, no_frames,
                         quantized_coeffs, ref_frames)
     res = [get_bits(no_frames, 64); get_bits(predictedPerRef, 16)]
-    push!(res, binarize_mv(vid_mv)...)
-    push!(res, binarize_res(quantized_coeffs)...)
-    push!(res, binarize_ref_frames(ref_frames)...)
-    bitstream_bac_encode(res)
+    bin_mv = binarize_mv(vid_mv)
+    bin_res = binarize_res(quantized_coeffs)
+    bin_ref = binarize_ref_frames(ref_frames)
+    bitstream_bac_encode(vcat(res,bin_mv,bin_res,bin_ref))
 end
 
 function decode_bin_bac(bitstream)
