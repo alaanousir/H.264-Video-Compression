@@ -101,30 +101,29 @@ def interlace_comp_frames(complete_frames):
 
 def deinterlace_comp_frames(interlaced_frames):
     
-    c_rows, c_cols = interlaced_frames[0][1].shape * np.array([0.5,1])
+    c_rows, c_cols = interlaced_frames[1].shape * np.array([0.5,1])
     c_rows, c_cols = np.int(c_rows), np.int(c_cols)
-    complete_frames = []
-    for frame in interlaced_frames:
-        c_b = frame[1]
-        c_r = frame[2]
-        
-        Cb1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
-        Cb2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+    
+    c_b = interlaced_frames[1]
+    c_r = interlaced_frames[2]
+    
+    Cb1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+    Cb2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
 
-        Cr1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
-        Cr2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+    Cr1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
+    Cr2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
 
-        for r in range(c_rows*2):
-            if r%2 == 0:
-                Cb1[np.int(r/2)] = c_b[r]
-                Cr1[np.int(r/2)] = c_r[r]
-            else: 
-                Cb2[np.int(r/2)] = c_b[r]
-                Cr2[np.int(r/2)] = c_r[r]
-                
-        complete_frames.append([frame[0],Cb1,Cr1,Cb2,Cr2])
+    for r in range(c_rows*2):
+        if r%2 == 0:
+            Cb1[np.int(r/2)] = c_b[r]
+            Cr1[np.int(r/2)] = c_r[r]
+        else: 
+            Cb2[np.int(r/2)] = c_b[r]
+            Cr2[np.int(r/2)] = c_r[r]
+            
+    
         
-    return complete_frames
+    return [interlaced_frames[0],Cb1,Cr1,Cb2,Cr2]
 
 def get_sub_images(image_array, box_size=16):
     """
@@ -282,31 +281,3 @@ def reconstructed(predicted_frame, quantized_coeff):
         reconstructed_current
     """
     #return reconstructed_current
-
-    
-def deinterlace_comp_frames(interlaced_frames):
-    
-    c_rows, c_cols = interlaced_frames[1].shape * np.array([0.5,1])
-    c_rows, c_cols = np.int(c_rows), np.int(c_cols)
-    #complete_frames = []
-    #for frame in interlaced_frames:
-    c_b = interlaced_frames[1]
-    c_r = interlaced_frames[2]
-    
-    Cb1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
-    Cb2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
-
-    Cr1 = np.zeros((c_rows, c_cols), dtype= np.uint8)
-    Cr2 = np.zeros((c_rows, c_cols), dtype= np.uint8)
-
-    for r in range(c_rows*2):
-        if r%2 == 0:
-            Cb1[np.int(r/2)] = c_b[r]
-            Cr1[np.int(r/2)] = c_r[r]
-        else: 
-            Cb2[np.int(r/2)] = c_b[r]
-            Cr2[np.int(r/2)] = c_r[r]
-                
-        #complete_frames.append([frame[0],Cb1,Cr1,Cb2,Cr2])
-        
-    return [interlaced_frames[0],Cb1,Cr1,Cb2,Cr2]

@@ -2,6 +2,7 @@ import Encoder as E
 import numpy as np
 from PIL import Image
 import julia 
+import math
 jl = julia.Julia()
 jl.include('bac.jl')
 jl.include('motion_estimation.jl')
@@ -14,7 +15,7 @@ def encode(path,predictedPerRef, no_frames = 1000,Resolution=1):
     vid_mv=[]
     vid_residuals=[]
     c=1
-    for j in range(0,np.int(len(vid_frame)/predictedPerRef)):
+    for j in range(0,math.ceil(len(vid_frame)/predictedPerRef)):
 
         #Reshaping the reference frames to use in the coming blocks
         im_ref_y,_,_=E.get_sub_images(E.reshape_image(ref_frames[j][0]))
@@ -27,15 +28,15 @@ def encode(path,predictedPerRef, no_frames = 1000,Resolution=1):
             current_im_blocks, nrows, ncols = E.get_sub_images(E.reshape_image(vid_frame[c][0]))
             
             #Motion estimation 
-            mv = jl.motion_estimation_to_all(ref_frames[0][0], current_im_blocks, nrows, ncols)
+            mv = jl.motion_estimation_to_all(ref_frames[j][0], current_im_blocks, nrows, ncols)
 
             #Motion Compensation
             p_image_y = E.predict(im_ref_y,mv, ref_frames[0][0].shape[0], ref_frames[0][0].shape[1],16)
             mv_cb=np.zeros(mv.shape,dtype=int)
-            for i in range(mv.shape[0]):
-                for j in range(mv.shape[1]):
-                    mv_cb[i][j][0]=np.int(mv[i][j][0]/2)
-                    mv_cb[i][j][1]=np.int(mv[i][j][1]/2)
+            for x in range(mv.shape[0]):
+                for z in range(mv.shape[1]):
+                    mv_cb[x][z][0]=np.int(mv[x][z][0]/2)
+                    mv_cb[x][z][1]=np.int(mv[x][z][1]/2)
 
             p_image_cb=E.predict(im_ref_cb,mv_cb, ref_frames[0][1].shape[0], ref_frames[0][1].shape[1],8)
             p_image_cr=E.predict(im_ref_cr,mv_cb, ref_frames[0][2].shape[0], ref_frames[0][2].shape[1],8)
@@ -57,6 +58,8 @@ def encode(path,predictedPerRef, no_frames = 1000,Resolution=1):
             
 
             c+=1
+            if(c>len(vid_frame)-1):
+                break
         c+=1
     # Delete unwanted variables 
     #del ref_frames
@@ -81,7 +84,7 @@ def encode(path,predictedPerRef, no_frames = 1000,Resolution=1):
 
     return Encoded_BitStream  
 
-def decoder(Encoded_BitStream,predictedPerRef, no_frames = 1000,Resolution=1):
+def decode(Encoded_BitStream,predictedPerRef, no_frames = 1000,Resolution=1):
     
     Bitstream=jl.bitstream_bac_decode(Encoded_BitStream)
     
@@ -107,7 +110,7 @@ def decoder(Encoded_BitStream,predictedPerRef, no_frames = 1000,Resolution=1):
 
     Reconstruced_frames=[]
     c=0
-    for j in range(0,np.int(no_frames/predictedPerRef)):
+    for j in range(0,math.ceil(no_frames/predictedPerRef)):
         Reconstruced_frames.append(E.conv_decom_YUV2RGB(E.deinterlace_comp_frames(ref_frames[j])))
 
         #Reshaping the reference frames to use in the coming blocks
@@ -119,10 +122,10 @@ def decoder(Encoded_BitStream,predictedPerRef, no_frames = 1000,Resolution=1):
             #residual_blocks, n_rows, n_cols = E.spatial_inverse_model(vid_residuals[c])
             #residual_frame = E.get_reconstructed_image(residual_blocks, n_rows, n_cols)
             mv=vid_mv[c]
-            for i in range(mv.shape[0]):
-                for j in range(mv.shape[1]):
-                    mv_cb[i][j][0]=np.int(mv[i][j][0]/2)
-                    mv_cb[i][j][1]=np.int(mv[i][j][1]/2)
+            for x in range(mv.shape[0]):
+                for z in range(mv.shape[1]):
+                    mv_cb[x][z][0]=np.int(mv[x][z][0]/2)
+                    mv_cb[x][z][1]=np.int(mv[x][z][1]/2)
             #getting the predicted image
             p_image_y=E.predict(im_ref_y,mv, ref_frames[0][0].shape[0], ref_frames[0][0].shape[1])
             p_image_cb=E.predict(im_ref_cb,mv_cb, ref_frames[0][1].shape[0], ref_frames[0][1].shape[1],8)
@@ -136,6 +139,8 @@ def decoder(Encoded_BitStream,predictedPerRef, no_frames = 1000,Resolution=1):
             Reconstructed_interlaced=[Reconstructed_y,Reconstructed_cb,Reconstructed_cr]
             Reconstruced_frames.append(E.conv_decom_YUV2RGB(E.deinterlace_comp_frames(Reconstructed_interlaced)))
             c+=1
+            if(c>len(vid_frame)-1):
+                break
 
             
 
