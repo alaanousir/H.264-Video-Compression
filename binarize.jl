@@ -27,7 +27,6 @@ end
 read_bits_to_decimal(bitstream, nbits) = sum((1 .<< ((nbits-1):-1:0)).* 
                                        [popfirst!(bitstream) for _ ∈ 1:nbits])
 function debinarize_mv(bitstream)
-    println(length(bitstream))
     mv_size = read_bits_to_decimal(bitstream, 8)
     offset_sign = if popfirst!(bitstream) 1 else -1 end
     offset = read_bits_to_decimal(bitstream, mv_size)
@@ -40,6 +39,50 @@ function debinarize_mv(bitstream)
         vid_mv[f,c,r,1] = read_bits_to_decimal(bitstream, mv_size)
         vid_mv[f,c,r,2] = read_bits_to_decimal(bitstream, mv_size)
     end    end    end
-    vid_mv .+ offset_sign*offset
+    vid_mv .+ offset_sign*offset , n_frames, n_row, n_col
+end
+
+function binarize_res(quantized_coeff_y, quantized_coeff_cb, quantized_coeff_cr)
+    offset = min(quantized_coeff_y..., quantized_coeff_cb... , quantized_coeff_cr...)
+    quantized_coeff_y = quantized_coeff_y .+ -offset
+    quantized_coeff_cb = quantized_coeff_cb .+ -offset
+    quantized_coeff_cr = quantized_coeff_cr .+ -offset
+
+    max_res = max(quantized_coeff_y..., quantized_coeff_cb... , quantized_coeff_cr...)
+    res_size = Int(ceil(log2(max_res)))
+    @assert res_size==9 "each should occupy 9 bits"
+
+    res = BitArray([offset >= 0; get_bits(abs(offset), res_size)]) # empty BitArray
+    for i in 1:size(quantized_coeff_y)[1] for j in 1:size(quantized_coeff_y)[2]
+            push!(res, get_bits(quantized_coeff_y[i,j], res_size)...)
+    end end
+    for i in 1:size(quantized_coeff_cb)[1] for j in 1:size(quantized_coeff_cb)[2]
+        push!(res, get_bits(quantized_coeff_cb[i,j], res_size)...)
+    end end
+    for i in 1:size(quantized_coeff_cr)[1] for j in 1:size(quantized_coeff_cr)[2]
+        push!(res, get_bits(quantized_coeff_cr[i,j], res_size)...)
+    end end
+    res
+end
+
+function debinarize_res(bitstream, n_blocks, n_frames)
+    res_size = 9
+    offset_sign = if popfirst!(bitstream) 1 else -1 end
+    offset = read_bits_to_decimal(bitstream, res_size)
+    quantized_coeff_y = zeros(Int, n_frames, n_blocks * 16 * 16)
+    quantized_coeff_cb = zeros(Int, n_frames, n_blocks * 8 * 8)
+    quantized_coeff_cr = zeros(Int, n_frames, n_blocks * 8 * 8)
+    for i in 1:size(quantized_coeff_y)[1] for j in 1:size(quantized_coeff_y)[2]
+        quantized_coeff_y[i, j] = read_bits_to_decimal(bitstream, res_size)
+    end end
+    for i in 1:size(quantized_coeff_cb)[1] for j in 1:size(quantized_coeff_cb)[2]
+        quantized_coeff_cb[i, j] = read_bits_to_decimal(bitstream, res_size)
+    end end
+    for i in 1:size(quantized_coeff_cr)[1] for j in 1:size(quantized_coeff_cr)[2]
+        quantized_coeff_cr[i, j] = read_bits_to_decimal(bitstream, res_size)
+    end end
+    quantized_coeff_y .+ offset_sign*offset,
+    quantized_coeff_cb .+ offset_sign*offset,
+    quantized_coeff_cr .+ offset_sign*offset
 end
 

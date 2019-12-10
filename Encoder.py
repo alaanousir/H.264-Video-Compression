@@ -226,7 +226,7 @@ def spatial_model(residual_frame, box_size):
     else:
         table = m.table_8_low        
     quantized_coeff = e.quantize(coeff, table)
-    return quantized_coeff
+    return e.run_length_code(e.serialize(quantized_coeff))
 
 def spatial_inverse_model(quantized_coeff, n_rows, n_cols, box_size):
     """
@@ -242,7 +242,8 @@ def spatial_inverse_model(quantized_coeff, n_rows, n_cols, box_size):
         table =  m.table_16_low
     else:
         table = m.table_8_low 
-        
+    quantized_coeff = d.run_length_decode(quantized_coeff)
+    quantized_coeff = d.deserialize(quantized_coeff, n_rows*n_cols, box_size, box_size)
     dequantized_coeff=d.dequantize(quantized_coeff, table)
     divided_image = d.apply_idct_to_all(dequantized_coeff)
     return d.get_reconstructed_image(divided_image, n_rows, n_cols, box_size)
