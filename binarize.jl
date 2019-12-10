@@ -120,9 +120,9 @@ function binarize_ref_frames(ref_frames::Array{Array{UInt8,2},2})
     res
 end
 function debinarize_ref_frames(bitstream, n_frames, nrow, ncol, pos)
-    ref_frames_y = Array{UInt8,3}(undef, n_frames, ncol, nrow)
-    ref_frames_cb = Array{UInt8,3}(undef, n_frames, div(ncol,2), div(nrow,2))
-    ref_frames_cr = Array{UInt8,3}(undef, n_frames, div(ncol,2), div(nrow,2))
+    ref_frames_y = Array{UInt8,3}(undef, n_frames, nrow, ncol)
+    ref_frames_cb = Array{UInt8,3}(undef, n_frames, div(nrow,2), div(ncol,2))
+    ref_frames_cr = Array{UInt8,3}(undef, n_frames, div(nrow,2), div(ncol,2))
     function _debinarize_ref_helper(arr)
         for i in 1:size(arr)[1] for j in 1:size(arr)[2] for k in 1:size(arr)[3]
             arr[i,j,k] = read_bits_to_decimal(bitstream,8, pos)
