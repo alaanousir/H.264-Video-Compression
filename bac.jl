@@ -187,8 +187,6 @@ function bitstream_bac_encode(data::Union{Vector{Bool}, BitArray{1}})
     # define how to output bits; append bits to res
     output_bit(bit::Bool) =  push!(res, bit)
     # Perform an encoding step for all bits in data 
-    println(LOP)
-    println(LOB)
     for bit::Bool ∈ data
         encode_step(bit, state, conf, LOP, LOB, output_bit)
     end
@@ -236,7 +234,6 @@ function bitstream_bac_decode(encoded_data::Union{Vector{Bool}, BitArray{1}})
 
     # popfirst! : Removes and returns the first item from collection.
     LOB = popfirst!(encoded_data) # Get the Least Occuring Bit
-    println(LOB)
     # Calculate the LOP from the binary stream 
     binary_LOP = [popfirst!(encoded_data) for _ ∈ 1:64] # Step 1 Pull(Pop) the bits
     LOP = sum((UInt64(1) .<< (63:-1:0)) .* binary_LOP) / ((typemax(UInt64)>>1) + 1)
@@ -247,7 +244,6 @@ function bitstream_bac_decode(encoded_data::Union{Vector{Bool}, BitArray{1}})
     bin_len_data = [popfirst!(encoded_data) for _ ∈ 1:64] # Step 1 Pull the bits
     bin_len_data = sum((UInt64(1) .<< (63:-1:0)).*bin_len_data) # Step 2 convert to UInt
                     # sum the the bits converted to Unsigned Int
-    println(LOP)
     # Initialize state using config
     # low to 0, high to max value (top) and value to 0  
     state = init_bac_decode(conf)
@@ -264,9 +260,6 @@ function bitstream_bac_decode(encoded_data::Union{Vector{Bool}, BitArray{1}})
     current_index = 1
     len = length(encoded_data)
     while length(res) < bin_len_data
-        # if current_index%10000 == 0
-        #     print("\r $(current_index/len*100)%")
-        # end
         bit, current_index = decode_step(current_index, encoded_data, state, conf, LOP, LOB)
         push!(res, bit)
     end
