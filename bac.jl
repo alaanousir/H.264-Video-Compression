@@ -165,7 +165,10 @@ function bitstream_bac_encode(data::Union{Vector{Bool}, BitArray{1}})
 
     p1 = sum(data)/length(data) # probability of bit 1 
 
-    LOP = if p1 <= 0.5 p1 else 1.0 - p1 end #Least Occuring Probability
+    p0 = sum(1 .- data)/length(data) # probability of bit 1 
+
+
+    LOP = if p1 <= 0.5 1.0 - p0 else 1.0 - p1 end  + 1e-6  #Least Occuring Probability
 
     LOB =  p1 <= 0.5 #Least Occuring Bit
 
@@ -288,7 +291,7 @@ function decode_step(current_index::Int, encoded_data::BitArray{1},
     conf::bac_config{T}, LOP::AbstractFloat,
     LOB::Bool) where T
     range = state.high - state.low + 1 # calculate range and ensure type is T
-    cp = (state.value - state.low + 1)/range # Calculate the Cummulative probability
+    cp = (state.value - state.low + 1)/range  - 1e-6# Calculate the Cummulative probability
     bit = cp >= LOP # 1 if cp bigger that LOP NOTE: CP[MOP] = LOP, CP[LOP] = 0
     # if LOB [0, po) * range 
     # if MOB [po, 1) * range 
